@@ -1,75 +1,21 @@
-name: Deploy True Legacy Dashboard
-
+name: Deploy Frontend
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Install Node.js
-        uses: actions/setup-node@v3
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          node-version: "18"
-
-      - name: Install Dependencies and Build
-        env:
-          VITE_APP_API_URL: ${{ secrets.VITE_APP_API_URL }}
-          VITE_APP_API_KEY: ${{ secrets.VITE_APP_API_KEY }}
-        run: |
-          npm ci
-          npm run build
-
-      - name: Rename dist to truelegacy-dashboard
-        run: mv ./dist ./truelegacy-dashboard
-
-      - name: Clean Temporary Directory on Linode
-        uses: appleboy/ssh-action@v0.1.6
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
           port: 4967
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Remove old temporary directory if it exists
-            rm -rf ~/deploy-temp
-            mkdir ~/deploy-temp
-
-      - name: Copy Files to Linode
-        uses: appleboy/scp-action@v0.1.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: 4967
-          source: ./truelegacy-dashboard/
-          target: ~/deploy-temp/
-
-      - name: Deploy on Linode
-        uses: appleboy/ssh-action@v0.1.6
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: 4967
-          script: |
-            # Remove old deployment
-            sudo -n rm -rf /var/www/html/truelegacy-dashboard
-
-            # Move new files to the deployment directory
-            sudo -n mv ~/deploy-temp/* /var/www/html/
-
-            # Remove temporary deployment folder
-            sudo -n rm -rf ~/deploy-temp
-
-            # Clear any server-side cache
-            sudo -n rm -rf /var/cache/nginx/*
-
-            # Restart NGINX to apply changes
-            sudo -n systemctl restart nginx
+            cd /var/www/html/truelegacy-website
+            git pull origin main
+            npm install
+            npm run build
