@@ -18,3 +18,5 @@ export const getLogById = async (id) => {
     throw error.response.data;
   }
 };
+
+//remove log by id
