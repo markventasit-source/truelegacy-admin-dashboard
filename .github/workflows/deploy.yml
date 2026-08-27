@@ -15,7 +15,7 @@ jobs:
           port: 4967
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /var/www/html/truelegacy-website
+            cd /var/www/html/truelegacy-dashboard-new
             git pull origin main
             npm install
             npm run build
