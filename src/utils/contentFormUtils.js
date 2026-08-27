@@ -20,6 +20,18 @@ export function toSubSections(sections) {
     }));
 }
 
+/** Normalize FAQ rows for create/update (drop empty pairs). */
+export function toFaqs(faqs) {
+  if (!Array.isArray(faqs)) return [];
+  return faqs
+    .filter((f) => f && (f.question || f.answer))
+    .map((f) => ({
+      question: String(f.question || "").trim(),
+      answer: String(f.answer || "").trim(),
+    }))
+    .filter((f) => f.question && f.answer);
+}
+
 /** SEO fields — always send trimmed strings so edits persist. */
 export function toSeoFields(data = {}) {
   return {

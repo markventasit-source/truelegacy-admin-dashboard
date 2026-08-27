@@ -24,6 +24,7 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import SeoFields from "./SeoFields";
 import MarkdownEditor from "./MarkdownEditor";
 import {
+  toFaqs,
   toRelatedBlogIds,
   toSeoFields,
   toSubSections,
@@ -67,6 +68,7 @@ const ArticleForm = () => {
       image_alt: "",
       related_blogs: [],
       sub_sections: [],
+      faqs: [],
       meta_title: "",
       meta_description: "",
       meta_keywords: "",
@@ -76,6 +78,15 @@ const ArticleForm = () => {
   const { fields, append, remove } = useFieldArray({
     control,
     name: "sub_sections",
+  });
+
+  const {
+    fields: faqFields,
+    append: appendFaq,
+    remove: removeFaq,
+  } = useFieldArray({
+    control,
+    name: "faqs",
   });
 
   const imageFile = watch("image");
@@ -119,6 +130,7 @@ const ArticleForm = () => {
       image_alt: article.image_alt || "",
       related_blogs: toRelatedBlogIds(article.related_blogs),
       sub_sections: article.sub_sections || [],
+      faqs: article.faqs || [],
       meta_title: article.meta_title || "",
       meta_description: article.meta_description || "",
       meta_keywords: article.meta_keywords || "",
@@ -161,6 +173,7 @@ const ArticleForm = () => {
       dark_content: data.dark_content || "",
       faded_content: data.faded_content || "",
       sub_sections: toSubSections(data.sub_sections),
+      faqs: toFaqs(data.faqs),
       related_blogs: toRelatedBlogIds(data.related_blogs),
       ...toSeoFields(data),
       ...(imageUrl && { image: imageUrl }),
@@ -425,6 +438,66 @@ const ArticleForm = () => {
                   onClick={() => append({ title: "", content: "" })}
                 >
                   + Add Section
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-lg font-medium">FAQs</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Optional. Shown as an accordion on the public resource page.
+              </p>
+              {faqFields.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="border rounded-md p-4 mt-4 space-y-3"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-semibold text-gray-800">
+                      FAQ {index + 1}
+                    </h3>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeFaq(index)}
+                    >
+                      <Trash2 className="h-5 w-5 text-gray-500" />
+                    </Button>
+                  </div>
+
+                  <div>
+                    <Label>Question</Label>
+                    <Input
+                      placeholder="Enter FAQ question"
+                      {...register(`faqs.${index}.question`, {
+                        required: "FAQ question is required",
+                      })}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Answer</Label>
+                    <textarea
+                      placeholder="Enter FAQ answer"
+                      {...register(`faqs.${index}.answer`, {
+                        required: "FAQ answer is required",
+                      })}
+                      className="mt-1 flex min-h-[96px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex justify-center mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => appendFaq({ question: "", answer: "" })}
+                >
+                  + Add FAQ
                 </Button>
               </div>
             </div>
