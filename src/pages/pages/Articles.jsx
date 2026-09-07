@@ -9,7 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, ArrowRightLeft } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import TableSkeleton from "@/components/ui/TableSkeleton";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -23,6 +23,8 @@ import {
   useGetArticles,
   useUpdateArticle,
 } from "@/store/useArticle";
+import { useMoveContentType } from "@/store/useMoveContentType";
+import { CONTENT_TYPE_LABELS } from "@/utils/contentTypeRegistry";
 import { useNavigate } from "@tanstack/react-router";
 import moment from "moment";
 import { usePersistedPagination } from "@/hooks/usePersistedPagination";
@@ -65,6 +67,7 @@ const Articles = () => {
   const { mutateAsync: deleteArticle, isLoading: isDeleting } =
     useDeleteArticle();
   const { mutate: updateArticleMutation } = useUpdateArticle();
+  const { mutate: moveMutation } = useMoveContentType("article");
 
   const articles = data?.data || [];
   const totalRows = data?.total_count || 0;
@@ -157,6 +160,29 @@ const Articles = () => {
       }
     );
   };
+
+  const handleMove = (item, toType) => {
+    moveMutation(
+      { id: item._id, toType, item },
+      {
+        onSuccess: () => {
+          toast.success(`Moved to ${CONTENT_TYPE_LABELS[toType]} successfully`);
+        },
+        onError: (err) => {
+          toast.error(err?.message || "Failed to move item");
+        },
+      }
+    );
+  };
+
+  const getMoveSubMenu = (item) => ({
+    label: "Move to",
+    icon: ArrowRightLeft,
+    items: ["blog", "news", "event"].map((type) => ({
+      label: CONTENT_TYPE_LABELS[type],
+      onClick: () => handleMove(item, type),
+    })),
+  });
   return (
     <div className="space-y-6 mt-4">
       <h1 className="text-xl font-semibold">Article Management</h1>
@@ -274,6 +300,7 @@ const Articles = () => {
                         onClick: () => handleRowDeleteClick(p._id),
                       },
                     ]}
+                    subMenus={[getMoveSubMenu(p)]}
                   />
                 </TableCell>
               </TableRow>

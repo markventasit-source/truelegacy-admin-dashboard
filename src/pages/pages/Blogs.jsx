@@ -9,7 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, ArrowRightLeft } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import TableSkeleton from "@/components/ui/TableSkeleton";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import { Pagination } from "@/components/ui/Pagination";
 import FilterDropdown from "@/components/ui/FilterDropdown";
 import { useDeleteBlog, useGetBlogs, useUpdateBlog } from "@/store/useBlog";
+import { useMoveContentType } from "@/store/useMoveContentType";
+import { CONTENT_TYPE_LABELS } from "@/utils/contentTypeRegistry";
 import { useNavigate } from "@tanstack/react-router";
 import moment from "moment";
 import { usePersistedPagination } from "@/hooks/usePersistedPagination";
@@ -60,6 +62,7 @@ const Blogs = () => {
   });
   const { mutateAsync: deleteBlog, isLoading: isDeleting } = useDeleteBlog();
   const { mutate: updateBlogMutation } = useUpdateBlog();
+  const { mutate: moveMutation } = useMoveContentType("blog");
 
   const blogs = data?.data || [];
   const totalRows = data?.total_count || 0;
@@ -149,6 +152,29 @@ const Blogs = () => {
       }
     );
   };
+
+  const handleMove = (item, toType) => {
+    moveMutation(
+      { id: item._id, toType, item },
+      {
+        onSuccess: () => {
+          toast.success(`Moved to ${CONTENT_TYPE_LABELS[toType]} successfully`);
+        },
+        onError: (err) => {
+          toast.error(err?.message || "Failed to move item");
+        },
+      }
+    );
+  };
+
+  const getMoveSubMenu = (item) => ({
+    label: "Move to",
+    icon: ArrowRightLeft,
+    items: ["article", "news", "event"].map((type) => ({
+      label: CONTENT_TYPE_LABELS[type],
+      onClick: () => handleMove(item, type),
+    })),
+  });
   return (
     <div className="space-y-6 mt-4">
       <h1 className="text-xl font-semibold">Blog Management</h1>
@@ -274,6 +300,7 @@ const Blogs = () => {
                         onClick: () => handleRowDeleteClick(p._id),
                       },
                     ]}
+                    subMenus={[getMoveSubMenu(p)]}
                   />
                 </TableCell>
               </TableRow>

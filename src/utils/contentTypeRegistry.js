@@ -50,3 +50,10 @@ export const paginateItems = (items, pageNo = 1, limit = 10) => {
   const start = (pageNo - 1) * limit;
   return items.slice(start, start + limit);
 };
+
+export const CONTENT_TYPE_LABELS = {
+  blog: "Blog",
+  article: "Article",
+  news: "News",
+  event: "Event",
+};
