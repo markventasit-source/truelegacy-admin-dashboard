@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { ListItem, OrderedList } from "@tiptap/extension-list";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import Youtube from "@tiptap/extension-youtube";
@@ -34,6 +35,57 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+/**
+ * Fix for tiptap-markdown 0.9 + TipTap v3:
+ * In TipTap v3, listItem has content "paragraph block*", so each item wraps
+ * its text in a <p> node. tiptap-markdown's default list_item serializer
+ * calls renderContent(), hits the paragraph serializer, and emits \n\n —
+ * breaking ordered-list numbering on every round-trip.
+ *
+ * We extend ListItem and OrderedList via .extend({ addStorage() }) so
+ * tiptap-markdown's getMarkdownSpec() picks up the correct serializers.
+ * These extended versions are passed to StarterKit to replace the built-ins.
+ */
+const ListItemFixed = ListItem.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state, node) {
+          // Flatten the inner <p> wrapper so we get "1. text" not "1.\n\n  text"
+          if (
+            node.childCount === 1 &&
+            node.firstChild?.type.name === "paragraph"
+          ) {
+            state.renderInline(node.firstChild);
+            state.ensureNewLine();
+          } else {
+            state.renderContent(node);
+          }
+        },
+        parse: {}, // handled by markdown-it
+      },
+    };
+  },
+});
+
+const OrderedListFixed = OrderedList.extend({
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state, node) {
+          const start = node.attrs.start ?? 1;
+          const maxW = String(start + node.childCount - 1).length;
+          state.renderList(node, "  ", (i) => {
+            const nStr = String(start + i);
+            return " ".repeat(maxW - nStr.length) + nStr + ". ";
+          });
+        },
+        parse: {}, // handled by markdown-it
+      },
+    };
+  },
+});
 
 const HEADING_LEVELS = [1, 2, 3, 4, 5, 6];
 
@@ -105,6 +157,10 @@ const MarkdownEditor = ({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4, 5, 6] },
+        // Disable the built-in listItem and orderedList so our fixed
+        // versions (which carry the correct tiptap-markdown serializers) win.
+        listItem: false,
+        orderedList: false,
         // StarterKit already includes Link — configure it here to avoid duplicates
         link: {
           openOnClick: false,
@@ -116,6 +172,8 @@ const MarkdownEditor = ({
           },
         },
       }),
+      ListItemFixed,
+      OrderedListFixed,
       Image.configure({
         allowBase64: false,
         HTMLAttributes: { class: "max-w-full rounded-md" },
