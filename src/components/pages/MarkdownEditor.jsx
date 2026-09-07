@@ -38,30 +38,45 @@ import { cn } from "@/lib/utils";
 
 /**
  * Fix for tiptap-markdown 0.9 + TipTap v3:
- * In TipTap v3, listItem has content "paragraph block*", so each item wraps
- * its text in a <p> node. tiptap-markdown's default list_item serializer
- * calls renderContent(), hits the paragraph serializer, and emits \n\n —
- * breaking ordered-list numbering on every round-trip.
  *
- * We extend ListItem and OrderedList via .extend({ addStorage() }) so
- * tiptap-markdown's getMarkdownSpec() picks up the correct serializers.
- * These extended versions are passed to StarterKit to replace the built-ins.
+ * Problem 1 — listItem wraps text in <p> (content: "paragraph block*").
+ * The default serializer calls renderContent() → paragraph serializer → \n\n,
+ * which breaks ordered-list numbering on round-trips.
+ *
+ * Problem 2 — loose lists (items with nested content separated by blank lines)
+ * cause renderList to emit \n\n\n between items (flushClose(3)), making
+ * CommonMark parsers start a new <ol> at 1 for every item.
+ *
+ * Fix: extend ListItem to flatten the inner <p> and write nested block content
+ * with a single blank line (not two). Extend OrderedList to always emit
+ * incremental numbers and force tight=true so renderList uses flushClose(1).
  */
 const ListItemFixed = ListItem.extend({
   addStorage() {
     return {
       markdown: {
         serialize(state, node) {
-          // Flatten the inner <p> wrapper so we get "1. text" not "1.\n\n  text"
-          if (
-            node.childCount === 1 &&
-            node.firstChild?.type.name === "paragraph"
-          ) {
-            state.renderInline(node.firstChild);
-            state.ensureNewLine();
-          } else {
-            state.renderContent(node);
-          }
+          // Walk each child of the listItem manually so we control spacing.
+          node.forEach((child, _, i) => {
+            if (child.type.name === "paragraph") {
+              // Write paragraph inline — no closeBlock, no \n\n
+              if (i === 0) {
+                // First child: renderInline writes the text right after "N. "
+                state.renderInline(child);
+                state.ensureNewLine();
+              } else {
+                // Subsequent paragraphs (continuation): indent + blank line before
+                state.write("");
+                state.ensureNewLine();
+                state.renderInline(child);
+                state.ensureNewLine();
+              }
+            } else {
+              // Nested list or other block — just render it; renderList handles
+              // its own indentation via wrapBlock/delim.
+              state.render(child, node, i);
+            }
+          });
         },
         parse: {}, // handled by markdown-it
       },
@@ -76,10 +91,33 @@ const OrderedListFixed = OrderedList.extend({
         serialize(state, node) {
           const start = node.attrs.start ?? 1;
           const maxW = String(start + node.childCount - 1).length;
-          state.renderList(node, "  ", (i) => {
+
+          // Force tight rendering: prevents flushClose(3) between items.
+          // Without this, each item gets \n\n\n and CommonMark restarts the
+          // counter. With tight=true renderList uses flushClose(1) instead.
+          // Temporarily override the tight attr on the node object isn't
+          // possible (frozen), so we manipulate the serializer state directly.
+          const prevInTight = state.inTightList;
+          state.inTightList = true;
+
+          if (state.closed && state.closed.type === node.type) {
+            state.flushClose(3);
+          } else if (state.inTightList) {
+            state.flushClose(1);
+          }
+
+          node.forEach((child, _, i) => {
             const nStr = String(start + i);
-            return " ".repeat(maxW - nStr.length) + nStr + ". ";
+            const prefix = " ".repeat(maxW - nStr.length) + nStr + ". ";
+            if (i > 0) state.flushClose(1);
+            state.wrapBlock("  ", prefix, node, () =>
+              state.render(child, node, i)
+            );
           });
+
+          state.inTightList = prevInTight;
+          // Mark the list as closed so the serializer knows what follows
+          state.closeBlock(node);
         },
         parse: {}, // handled by markdown-it
       },
